@@ -1,0 +1,10 @@
+services:
+  ds-pipeline:
+    build: .
+    container_name: test_ds_credit
+    # Значения подставляются из .env рядом с compose-файлом или из окружения
+    # хоста. Пустой LLM_API_KEY = локальный режим (keyword matching).
+    environment:
+      - LLM_API_KEY=${LLM_API_KEY:-}
+      - LLM_MODEL=${LLM_MODEL:-gpt-4o-mini}
+      - LLM_BASE_URL=${LLM_BASE_URL:-}
