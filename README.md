@@ -24,13 +24,12 @@ python run_demo.py dataset/03_invoice.txt
 python run_demo.py file1.txt file2.txt          # несколько сразу
 ```
 
-Несуществующие файлы обрабатываются мягко (`[!] Файл не найден`), без падения.
 Без аргументов `run_demo.py` работает как раньше — демо на `dataset/`.
 
 ### Запуск в Docker
 
 ```bash
-docker compose up --build
+docker compose run --build --rm ds-pipeline
 ```
 
 или без compose:

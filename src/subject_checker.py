@@ -8,6 +8,9 @@ import re
 
 from src.config import LLM_API_KEY, LLM_BASE_URL, LLM_MODEL, llm_enabled
 
+# Состояние LLM-режима: заполняется при вызовах, читается через llm_info()
+_LLM_STATE: dict[str, str | None] = {"mode": None, "error": None}
+
 FUZZY_THRESHOLD = 0.84          # порог схожести токенов для difflib
 BASE_CONFIDENCE = 0.70          # уверенность при одном совпадении
 CONFIDENCE_STEP = 0.10          # прирост за каждое доп. совпадение
@@ -82,7 +85,8 @@ def _check_local(subject: str) -> tuple[bool, float, str]:
 
 
 def _check_llm(subject: str) -> tuple[bool, float, str] | None:
-    """Проверка через LLM (LangChain). Возвращает None при любой ошибке."""
+    """Проверка через LLM (LangChain). Возвращает None при любой ошибке;
+    причина ошибки сохраняется в _LLM_STATE и видна через llm_info()."""
     try:
         from langchain_openai import ChatOpenAI
 
@@ -105,8 +109,12 @@ def _check_llm(subject: str) -> tuple[bool, float, str] | None:
         )
         raw = llm.invoke(prompt).content
         data = json.loads(re.sub(r"```(json)?", "", raw).strip())
-        return bool(data["matches"]), float(data["confidence"]), str(data["reason"])
-    except Exception:
+        result = (bool(data["matches"]), float(data["confidence"]),
+                  str(data["reason"]))
+        _LLM_STATE.update(mode="cloud", error=None)
+        return result
+    except Exception as exc:
+        _LLM_STATE.update(mode="local", error=f"{type(exc).__name__}: {exc}")
         return None
 
 
@@ -118,3 +126,23 @@ def check_subject(subject: str) -> tuple[bool, float, str]:
         if (result := _check_llm(subject)) is not None:
             return result
     return _check_local(subject)
+
+
+def llm_info() -> str:
+    """Человекочитаемый статус: облачная LLM или локальный fallback."""
+    if not llm_enabled():
+        return "ЛОКАЛЬНЫЙ режим (keyword matching): LLM_API_KEY не задан"
+    base = LLM_BASE_URL or "https://api.openai.com/v1"
+    if _LLM_STATE["mode"] == "cloud":
+        return f"ОБЛАЧНАЯ LLM: {LLM_MODEL} @ {base}"
+    if _LLM_STATE["error"]:
+        return (f"FALLBACK на локальный режим: LLM недоступна "
+                f"({_LLM_STATE['error']}) | конфиг: {LLM_MODEL} @ {base}")
+    return f"Ключ задан, LLM ещё не вызывалась | конфиг: {LLM_MODEL} @ {base}"
+
+
+def llm_healthcheck() -> str:
+    """Пробный вызов LLM для проверки доступности; вернуть статус-строку."""
+    if llm_enabled():
+        _check_llm("удобрения")
+    return llm_info()

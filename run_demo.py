@@ -73,6 +73,8 @@ def analyze_paths(paths: list[str]) -> None:
 
 
 if __name__ == "__main__":
+    from src.subject_checker import llm_healthcheck
+    print(f"Режим LLM: {llm_healthcheck()}\n")
     if len(sys.argv) > 1:
         analyze_paths(sys.argv[1:])
     else:
