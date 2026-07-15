@@ -104,7 +104,6 @@ def _check_llm(subject: str) -> tuple[bool, float, str] | None:
             model=LLM_MODEL,
             api_key=LLM_API_KEY,
             base_url=LLM_BASE_URL,
-            temperature=0,
             timeout=30,
         )
         raw = llm.invoke(prompt).content
