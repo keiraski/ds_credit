@@ -12,7 +12,8 @@ from src.config import LLM_API_KEY, LLM_BASE_URL, LLM_MODEL, llm_enabled
 _LLM_STATE: dict[str, str | None] = {"mode": None, "error": None}
 
 FUZZY_THRESHOLD = 0.84          # порог схожести токенов для difflib
-BASE_CONFIDENCE = 0.70          # уверенность при одном совпадении
+BASE_CONFIDENCE = 0.80          # сильное совпадение (прямой сельхоз-ключ)
+WEAK_CONFIDENCE = 0.60          # только контекстные ключи -> ручная проверка
 CONFIDENCE_STEP = 0.10          # прирост за каждое доп. совпадение
 MAX_CONFIDENCE = 0.95
 FAIL_CONFIDENCE = 0.80          # уверенность при отсутствии совпадений
@@ -27,13 +28,22 @@ ALLOWED_CATEGORIES: dict[str, list[str]] = {
                        "сельхозтехника", "жатка"],
     "топливо и ГСМ": ["дизельное", "топливо", "гсм", "солярка"],
     "запчасти к сельхозтехнике": ["запчасти", "запасные"],
-    "полевые работы": ["вспашка", "посев", "посевной", "уборка", "урожай", "поле",
-                       "полей", "мелиорация", "орошение", "урожай", "урожая"],
+    "полевые работы": ["вспашка", "посев", "посевной", "уборка", "урожай",
+                       "урожая", "поле", "полей", "мелиорация", "орошение"],
     "животноводство": ["корм", "комбикорм", "скот", "крс", "ветеринарный",
                        "поголовье", "птица"],
     "хранение и переработка урожая": ["зерно", "зернохранилище", "элеватор",
                                       "сушилка", "зерна"],
 }
+
+# Слабые (контекстные) ключи: сами по себе не доказывают целевое
+# назначение — "дрон для мониторинга ПОЛЕЙ", "ПО для учёта УРОЖАЯ",
+# "ремонт ЗЕРНОХРАНИЛИЩА". Совпадение только по ним даёт низкую
+# уверенность и уходит на ручную проверку (см. check_subject_verdict).
+WEAK_KEYWORDS: frozenset[str] = frozenset({
+    "урожай", "урожая", "поле", "полей", "зерно", "зерна",
+    "зернохранилище", "корм",
+})
 
 # Явные стоп-маркеры нецелевого использования
 NEGATIVE_MARKERS: dict[str, str] = {
@@ -49,20 +59,30 @@ def _tokens(text: str) -> list[str]:
     return re.findall(r"[а-яёa-z0-9-]+", text.lower())
 
 
-def _match_categories(subject: str) -> list[str]:
-    """Вернуть список категорий, с которыми совпал предмет оплаты."""
+def _match_categories(subject: str) -> tuple[list[str], bool]:
+    """Вернуть (список совпавших категорий, есть ли сильное совпадение).
+
+    Сильное совпадение — ключ не из WEAK_KEYWORDS; слабые ключи
+    контекстные и сами по себе вердикт не подтверждают.
+    """
     tokens = _tokens(subject)
     matched: list[str] = []
+    strong_hit = False
     for category, keywords in ALLOWED_CATEGORIES.items():
+        category_hit = False
         for keyword in keywords:
             direct = any(t.startswith(keyword[:6]) and
                          difflib.SequenceMatcher(None, t, keyword).ratio()
                          >= FUZZY_THRESHOLD
                          for t in tokens)
             if direct or keyword in subject.lower():
-                matched.append(category)
-                break
-    return matched
+                category_hit = True
+                if keyword not in WEAK_KEYWORDS:
+                    strong_hit = True
+                    break  # сильный ключ найден, дальше не ищем
+        if category_hit:
+            matched.append(category)
+    return matched, strong_hit
 
 
 def _check_local(subject: str) -> tuple[bool, float, str]:
@@ -72,11 +92,12 @@ def _check_local(subject: str) -> tuple[bool, float, str]:
         if marker in lowered:
             return False, 0.91, reason
 
-    matched = _match_categories(subject)
+    matched, strong_hit = _match_categories(subject)
     if matched:
+        base = BASE_CONFIDENCE if strong_hit else WEAK_CONFIDENCE
         confidence = min(
             MAX_CONFIDENCE,
-            BASE_CONFIDENCE + CONFIDENCE_STEP * (len(matched) - 1),
+            base + CONFIDENCE_STEP * (len(matched) - 1),
         )
         joined = "', '".join(matched)
         return True, confidence, f"предмет относится к категории '{joined}'"
@@ -144,3 +165,20 @@ def llm_healthcheck() -> str:
     if llm_enabled():
         _check_llm("удобрения")
     return llm_info()
+
+# Порог ручной модерации (по ТЗ: «при низкой уверенности статус
+# устанавливается как "требуется ручная проверка"»). 0.75 разделяет
+# сильные совпадения (0.80+) и контекстные/слабые (0.60-0.70).
+REVIEW_THRESHOLD = 0.75
+
+
+def check_subject_verdict(subject: str) -> tuple[str, float, str]:
+    """Вердикт с учётом порога: PASS | FAIL | MANUAL_REVIEW.
+
+    При уверенности ниже REVIEW_THRESHOLD система не принимает
+    решение сама, а помечает кейс для оператора.
+    """
+    ok, confidence, reason = check_subject(subject)
+    if confidence < REVIEW_THRESHOLD:
+        return "MANUAL_REVIEW", confidence, reason
+    return ("PASS" if ok else "FAIL"), confidence, reason

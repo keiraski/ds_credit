@@ -13,7 +13,8 @@ from pathlib import Path
 from src.classifier import classify
 from src.extractor import extract
 from src.pipeline import analyze_file
-from src.subject_checker import check_subject
+from src.subject_checker import check_subject, check_subject_verdict
+
 
 DATASET_DIR = Path(__file__).parent / "dataset"
 SUBJECTS_FILE = DATASET_DIR / "subjects_test.txt"
@@ -44,7 +45,8 @@ def run_subject_checks() -> None:
             continue
         subject, expected = (part.strip() for part in line.rsplit("|", 1))
         ok, confidence, reason = check_subject(subject)
-        verdict = "PASS" if ok else "FAIL"
+        #verdict = "PASS" if ok else "FAIL"
+        verdict, confidence, reason = check_subject_verdict(subject)
         print(f"{subject:<46}{expected:<7}{verdict:<7}{confidence:<7.2f}{reason}")
 
 
@@ -67,7 +69,9 @@ def analyze_paths(paths: list[str]) -> None:
         print(f"Предмет оплаты: {fields['subject']}")
         if result["subject_check"] is not None:
             ok, confidence, reason = result["subject_check"]
-            verdict = "PASS" if ok else "FAIL"
+            #verdict = "PASS" if ok else "FAIL"
+            verdict, confidence, reason = check_subject_verdict(fields["subject"])
+
             print(f"Целевое исп-е : {verdict} (conf {confidence:.2f}) — {reason}")
         else:
             print("Целевое исп-е : предмет оплаты в документе не найден")
