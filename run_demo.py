@@ -25,7 +25,8 @@ def run_extraction_and_classification() -> None:
               f"{'Date':<12}{'INN':<14}Contractor")
     print(header)
     print("-" * len(header))
-    for path in sorted(DATASET_DIR.glob("0*.txt")):
+    for path in sorted(p for p in DATASET_DIR.glob("*.txt")
+                   if p.name != "subjects_test.txt"):
         text = path.read_text(encoding="utf-8")
         doc_type, confidence = classify(text)
         fields = extract(text)
