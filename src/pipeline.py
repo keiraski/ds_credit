@@ -1,8 +1,3 @@
-"""Единый анализ документа: тип + поля + проверка предмета оплаты.
-Связывает три модуля (``classifier``, ``extractor``, ``subject_checker``)
-в один вызов и умеет работать как с готовым текстом, так и с файлом.
-"""
-
 from __future__ import annotations
 
 from pathlib import Path

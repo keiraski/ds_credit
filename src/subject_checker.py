@@ -173,12 +173,12 @@ REVIEW_THRESHOLD = 0.75
 
 
 def check_subject_verdict(subject: str) -> tuple[str, float, str]:
-    """Вердикт с учётом порога: PASS | FAIL | MANUAL_REVIEW.
+    """Вердикт с учётом порога: PASS | FAIL | REVIEW.
 
     При уверенности ниже REVIEW_THRESHOLD система не принимает
     решение сама, а помечает кейс для оператора.
     """
     ok, confidence, reason = check_subject(subject)
     if confidence < REVIEW_THRESHOLD:
-        return "MANUAL_REVIEW", confidence, reason
+        return "REVIEW", confidence, reason
     return ("PASS" if ok else "FAIL"), confidence, reason

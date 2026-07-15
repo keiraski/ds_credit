@@ -22,7 +22,7 @@ SUBJECTS_FILE = DATASET_DIR / "subjects_test.txt"
 
 def run_extraction_and_classification() -> None:
     """Таблица: файл -> тип документа + извлечённые поля."""
-    header = (f"{'Файл':<24}{'Тип':<10}{'Conf':<7}{'Amount':<12}"
+    header = (f"{'Файл':<34}{'Тип':<10}{'Conf':<7}{'Amount':<12}"
               f"{'Date':<12}{'INN':<14}Contractor")
     print(header)
     print("-" * len(header))
@@ -31,7 +31,7 @@ def run_extraction_and_classification() -> None:
         text = path.read_text(encoding="utf-8")
         doc_type, confidence = classify(text)
         fields = extract(text)
-        print(f"{path.name:<24}{doc_type:<10}{confidence:<7.2f}"
+        print(f"{path.name:<34}{doc_type:<10}{confidence:<7.2f}"
               f"{str(fields['amount']):<12}{str(fields['date']):<12}"
               f"{str(fields['inn']):<14}{fields['contractor']}")
 
