@@ -131,13 +131,12 @@ def llm_info() -> str:
     """Человекочитаемый статус: облачная LLM или локальный fallback."""
     if not llm_enabled():
         return "ЛОКАЛЬНЫЙ режим (keyword matching): LLM_API_KEY не задан"
-    base = LLM_BASE_URL or "https://api.openai.com/v1"
     if _LLM_STATE["mode"] == "cloud":
-        return f"ОБЛАЧНАЯ LLM: {LLM_MODEL} @ {base}"
+        return f"ОБЛАЧНАЯ LLM: {LLM_MODEL}"
     if _LLM_STATE["error"]:
         return (f"FALLBACK на локальный режим: LLM недоступна "
-                f"({_LLM_STATE['error']}) | конфиг: {LLM_MODEL} @ {base}")
-    return f"Ключ задан, LLM ещё не вызывалась | конфиг: {LLM_MODEL} @ {base}"
+                f"({_LLM_STATE['error']}) | конфиг: {LLM_MODEL}")
+    return f"Ключ задан, LLM ещё не вызывалась | конфиг: {LLM_MODEL}"
 
 
 def llm_healthcheck() -> str:
